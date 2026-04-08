@@ -18,6 +18,7 @@
     {}
   )
   const lvl = opp?.original?.level
+  const relativeLevel = typeof lvl === 'string' && /^[+-]/.test(lvl)
 </script>
 
 <ul class="relative grid w-full grid-cols-4 text-sm md:mt-2 md:text-xs">
@@ -27,7 +28,7 @@
     <Icon inline={true} icon={Info} class="fill-current" />
     <Tooltip>
       Damage calculations are estimates of maximum
-      {#if lvl.startsWith('+') || lvl.startsWith('-')}
+      {#if relativeLevel}
         with the team and relative levels being at Level 50
       {:else}
         with the team being at the Level Cap.

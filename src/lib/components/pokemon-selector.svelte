@@ -14,7 +14,7 @@
   import { fly } from 'svelte/transition'
   import { Natures, NaturesMap } from '$lib/data/natures'
   import { NuzlockeStates, NuzlockeGroups } from '$lib/data/states'
-  import { IconButton, Input } from '$lib/components/core'
+  import { IconButton } from '$lib/components/core'
   import { Wrapper as SettingsWrapper } from '$lib/components/Settings'
 
   import AutoCompleteV2 from '$c/core/AutoCompleteV2.svelte'
@@ -40,7 +40,7 @@
 
   import { createEventDispatcher, onMount, getContext } from 'svelte'
 
-  let selected, nickname, status, nature, hidden, death
+  let selected, nickname, status, nature, hidden, death, level
   let prevstatus = 'loading'
 
   // Search text bindings for ACs
@@ -54,7 +54,7 @@
       (encounters || []).map((id) => e[id]).filter((i) => i)
     )
 
-  let Particles, EvoModal, DeathModal
+  let Particles, EvoModal, DeathModal, LevelModal
   onMount(() => {
     const [data] = readdata()
     const loc = data[location]
@@ -75,6 +75,9 @@
     import('$lib/components/DeathModal/index.svelte').then(
       (m) => (DeathModal = m.default)
     )
+    import('$lib/components/LevelModal.svelte').then((m) => {
+      LevelModal = m.default
+    })
     prevstatus = null
   })
 
@@ -124,6 +127,7 @@
         hidden = pkmn.hidden
         nickname = pkmn.nickname
         death = pkmn.death
+        level = pkmn.level ?? null
         if (pkmn.pokemon)
           getPkmn(pkmn.pokemon).then((p) => {
             selected = p
@@ -133,28 +137,35 @@
     )
 
   $: {
+    const parsedLevel = Number(level)
+    const trackedLevel =
+      Number.isFinite(parsedLevel) && parsedLevel >= 1 && parsedLevel <= 100
+        ? Math.floor(parsedLevel)
+        : null
+
     const topatch = nonnull({
-    id,
-    pokemon: selected?.alias,
-    status: status?.id,
-    nature: nature?.id,
-    location: locationName || location,
-    ...(nickname ? { nickname } : {}),
-    ...(hidden ? { hidden: true } : {}),
-    ...(status?.id === 5 && death ? { death } : {})
-  });
+      id,
+      pokemon: selected?.alias,
+      status: status?.id,
+      nature: nature?.id,
+      location: locationName || location,
+      ...(trackedLevel ? { level: trackedLevel } : {}),
+      ...(nickname ? { nickname } : {}),
+      ...(hidden ? { hidden: true } : {}),
+      ...(status?.id === 5 && death ? { death } : {})
+    })
 
-  if (selected && !oEqual(topatch, resetd)) {
-    console.log('Patching', location);
-    store.update(patch({ [location]: topatch }));
+    if (selected && !oEqual(topatch, resetd)) {
+      console.log('Patching', location)
+      store.update(patch({ [location]: topatch }))
 
-    // Remove from team if marked as dead
-    if (status?.id === 5 && (team || []).includes(location)) {
-      store.update(patch({ __team: team.filter((loc) => loc !== location) }));
+      // Remove from team if marked as dead
+      if (status?.id === 5 && (team || []).includes(location)) {
+        store.update(patch({ __team: team.filter((loc) => loc !== location) }))
+      }
     }
-  }
 
-  inteam = (team || []).includes(location);
+    inteam = (team || []).includes(location)
   }
 
   const onhide = () => {
@@ -198,7 +209,7 @@
   }
 
   function handleClear() {
-    status = nickname = selected = death = resetd = null
+    status = nickname = selected = death = resetd = level = null
     search = statusSearch = natureSearch = null
     store.update(
       patch({
@@ -216,6 +227,22 @@
 
       status = NuzlockeStates[sid]
       _animateStatus(sid)
+
+      if (sid === 1 && !level) {
+        const openModal = (Modal) =>
+          open(Modal, {
+            pokemon: nickname || selected?.name,
+            level,
+            submit: (nextLevel) => (level = nextLevel)
+          })
+
+        if (LevelModal) openModal(LevelModal)
+        else
+          import('$lib/components/LevelModal.svelte').then((m) => {
+            LevelModal = m.default
+            openModal(LevelModal)
+          })
+      }
     }
 
     if (sid === 5) return handleDeath(cb)
@@ -276,7 +303,7 @@
   <div
     class:lg:grid-cols-8={nicknames}
     class:lg:grid-cols-6={!nicknames}
-    class="relative flex grid w-full grid-cols-2 gap-y-3 gap-x-2 md:grid-cols-4 md:gap-y-2 lg:grid-cols-8 lg:gap-y-0"
+    class="relative flex grid w-full grid-cols-2 gap-y-3 gap-x-2 md:grid-cols-4 md:gap-y-2 lg:gap-y-0"
   >
     <span class="location group relative z-50">
       {#if $$slots.location}
