@@ -35,6 +35,7 @@
   import { UNOWN, createImgUrl } from '$utils/rewrites'
   import { toDb } from '$utils/link'
   import { summarise } from '$utils/badges'
+  import { calcStatsAtLevel } from '$lib/utils/manual-stats'
 
   const region = getContext('region')
   const { getPkmns, getPkmn } = getContext('game')
@@ -88,6 +89,11 @@
 
   const clear = () => (stat = type = '')
   const sum = (l) => l.reduce((acc, it) => acc + it, 0)
+  const trackedStats = (p) =>
+    calcStatsAtLevel(Pokemon[p.pokemon]?.baseStats, p.level, p.nature) ||
+    Pokemon[p.pokemon]?.baseStats ||
+    {}
+  const trackedMaxStat = (p) => Math.max(150, ...Object.values(trackedStats(p)))
   $: filter = (p) => {
     const [fType, fVal] = type.split(':')
 
@@ -118,10 +124,7 @@
 
   $: box = [...ogbox].sort((a, b) => {
     if (stat === 'total') {
-      return (
-        sum(Object.values(Pokemon[b.pokemon]?.baseStats)) -
-        sum(Object.values(Pokemon[a.pokemon]?.baseStats))
-      )
+      return sum(Object.values(trackedStats(b))) - sum(Object.values(trackedStats(a)))
     }
 
     if (stat === 'type') {
@@ -130,10 +133,7 @@
         .localeCompare(Pokemon[a.pokemon].types.join('/'))
 
       if (val !== 0) return val
-      return (
-        sum(Object.values(Pokemon[b.pokemon]?.baseStats)) -
-        sum(Object.values(Pokemon[a.pokemon]?.baseStats))
-      )
+      return sum(Object.values(trackedStats(b))) - sum(Object.values(trackedStats(a)))
     }
 
     if (type.startsWith('badge')) {
@@ -146,8 +146,7 @@
     }
 
     return stat
-      ? Pokemon[b.pokemon]?.baseStats[stat] -
-          Pokemon[a.pokemon]?.baseStats[stat]
+      ? trackedStats(b)[stat] - trackedStats(a)[stat]
       : a.id - b.id
   })
 
@@ -170,6 +169,15 @@
     import('$lib/components/EvolutionModal.svelte').then((m) => {
       EvoModal = m.default
       open(EvoModal, args)
+    })
+  }
+
+  let LevelModal
+  const openLevelModal = async (args) => {
+    if (LevelModal) open(LevelModal, args)
+    import('$lib/components/LevelModal.svelte').then((m) => {
+      LevelModal = m.default
+      open(LevelModal, args)
     })
   }
 
@@ -206,6 +214,16 @@
     killPokemon({ ...o, death })
     handleTeamRemove(o)
   }
+
+  const handleLevel = (p) => () =>
+    openLevelModal({
+      pokemon: p.nickname || Pokemon[p.pokemon]?.name,
+      level: p.level,
+      submit: (level) => {
+        const { level: _, ...rest } = p
+        updatePokemon({ ...rest, ...(level ? { level } : {}) })
+      }
+    })
 
   /** Team management */
   function handleTeamAdd(p) {
@@ -417,10 +435,7 @@
                   ext: 'png'
                 })}
                 fallback={UNOWN}
-                maxStat={Math.max(
-                  150,
-                  ...Object.values(Pokemon[p.pokemon].baseStats)
-                )}
+                maxStat={trackedMaxStat(p)}
                 moves={[]}
                 ability={p.nickname
                   ? {
@@ -430,7 +445,7 @@
                   : null}
                 level={p.level ? `${p.level}` : ''}
                 name={Pokemon[p.pokemon].name}
-                stats={Pokemon[p.pokemon].baseStats}
+                stats={trackedStats(p)}
                 nature={p.nature}
                 types={(Pokemon[p.pokemon].types || []).map((t) =>
                   t.toLowerCase()
@@ -505,6 +520,15 @@
 
                   {#if !p.customName}
                     <span class="mx-1">ǀ</span>
+
+                    <button
+                      class="inline border-b border-transparent transition hover:border-black hover:text-black dark:hover:text-gray-50"
+                      on:click|stopPropagation={handleLevel(p)}
+                    >
+                      {p.level ? `Lvl ${p.level}` : 'Set level'}
+                    </button>
+
+                    <span class="mx-1">Ç€</span>
 
                     <a
                       class="inline border-b border-transparent transition hover:border-black hover:text-black dark:hover:text-gray-50"

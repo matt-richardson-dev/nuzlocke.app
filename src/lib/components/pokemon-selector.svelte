@@ -14,7 +14,7 @@
   import { fly } from 'svelte/transition'
   import { Natures, NaturesMap } from '$lib/data/natures'
   import { NuzlockeStates, NuzlockeGroups } from '$lib/data/states'
-  import { IconButton, Input } from '$lib/components/core'
+  import { IconButton } from '$lib/components/core'
   import { Wrapper as SettingsWrapper } from '$lib/components/Settings'
 
   import AutoCompleteV2 from '$c/core/AutoCompleteV2.svelte'
@@ -54,7 +54,7 @@
       (encounters || []).map((id) => e[id]).filter((i) => i)
     )
 
-  let Particles, EvoModal, DeathModal
+  let Particles, EvoModal, DeathModal, LevelModal
   onMount(() => {
     const [data] = readdata()
     const loc = data[location]
@@ -75,6 +75,9 @@
     import('$lib/components/DeathModal/index.svelte').then(
       (m) => (DeathModal = m.default)
     )
+    import('$lib/components/LevelModal.svelte').then((m) => {
+      LevelModal = m.default
+    })
     prevstatus = null
   })
 
@@ -224,6 +227,22 @@
 
       status = NuzlockeStates[sid]
       _animateStatus(sid)
+
+      if (sid === 1 && !level) {
+        const openModal = (Modal) =>
+          open(Modal, {
+            pokemon: nickname || selected?.name,
+            level,
+            submit: (nextLevel) => (level = nextLevel)
+          })
+
+        if (LevelModal) openModal(LevelModal)
+        else
+          import('$lib/components/LevelModal.svelte').then((m) => {
+            LevelModal = m.default
+            openModal(LevelModal)
+          })
+      }
     }
 
     if (sid === 5) return handleDeath(cb)
@@ -282,8 +301,8 @@
 
 <SettingsWrapper id="nickname-clause" let:setting={nicknames}>
   <div
-    class:lg:grid-cols-9={nicknames}
-    class:lg:grid-cols-7={!nicknames}
+    class:lg:grid-cols-8={nicknames}
+    class:lg:grid-cols-6={!nicknames}
     class="relative flex grid w-full grid-cols-2 gap-y-3 gap-x-2 md:grid-cols-4 md:gap-y-2 lg:gap-y-0"
   >
     <span class="location group relative z-50">
@@ -510,19 +529,6 @@
         {/if}
       </div>
     </AutoCompleteV2>
-
-    <Input
-      rounded
-      type="number"
-      min={1}
-      max={100}
-      bind:value={level}
-      name="{location} Level"
-      placeholder="Level"
-      className="col-span-1 {!selected || status?.id === 4 || hidden
-        ? 'hidden sm:block'
-        : ''}"
-    />
 
     <span class="inline-flex gap-x-2 text-left">
       {#if selected && status && status.id !== 4 && status.id !== 5}
