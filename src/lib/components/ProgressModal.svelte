@@ -118,7 +118,9 @@
   let analysisResult
   onMount(async () => {
     setup(async (_, boxData) => {
-      const gymMons = await fetchPkmnSet(boss.pokemon, 'name')
+      const gymMons = (await fetchPkmnSet(boss.pokemon, 'name')).map((mon) =>
+        applyTrackedStats(mon)
+      )
       const estimatedLevel = Math.max(
         ...gymMons.map((mon) => Number(mon?.original?.level) || 0),
         1
